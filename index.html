@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QueryFinOps Sentinel — BigQuery Cost Observability | Kering</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --amber: #f59e0b;
+            --amber-bright: #fbbf24;
+            --pink: #ec4899;
+            --pink-bright: #f472b6;
+            --mint: #10b981;
+            --red: #ef4444;
+            --amber-glow: rgba(245, 158, 11, 0.4);
+            --pink-glow: rgba(236, 72, 153, 0.4);
+            --bg-dark: #0a0505;
+            --bg-card: #14090a;
+            --bg-elevated: #1e1214;
+            --text-primary: #fef3c7;
+            --text-secondary: #a8957a;
+            --text-muted: #70604e;
+            --border: #2b1e1c;
+            --border-amber: #3b2a20;
+            --finops-gradient: linear-gradient(135deg, #f59e0b 0%, #ec4899 50%, #a78bfa 100%);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Sora', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+            background-image:
+                radial-gradient(ellipse at 100% 0%, rgba(245, 158, 11, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 0% 100%, rgba(236, 72, 153, 0.08) 0%, transparent 50%);
+        }
+
+        .header {
+            background: linear-gradient(180deg, rgba(245, 158, 11, 0.05) 0%, transparent 100%);
+            border-bottom: 1px solid var(--border-amber);
+            padding: 0.75rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(20px);
+        }
+
+        .header-content {
+            max-width: 1800px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo-icon {
+            width: 46px;
+            height: 46px;
+            background: var(--finops-gradient);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            position: relative;
+        }
+
+        .logo-icon::after {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            background: var(--finops-gradient);
+            border-radius: 14px;
+            z-index: -1;
+            opacity: 0.5;
+            filter: blur(8px);
+        }
+
+        .logo-text {
+            font-size: 1.5rem;
+            font-weight: 800;
+            background: var(--finops-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo-subtitle {
+            font-size: 0.6rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            font-weight: 500;
+        }
+
+        .header-badges {
+            display: flex;
+            gap: 0.4rem;
+        }
+
+        .badge {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 0.35rem 0.7rem;
+            border-radius: 6px;
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+            font-family: 'Fira Code', monospace;
+        }
+
+        .badge.amber {
+            background: rgba(245, 158, 11, 0.12);
+            border-color: var(--amber);
+            color: var(--amber);
+        }
+
+        .badge.amber::before {
+            content: '';
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            background: var(--amber);
+            border-radius: 50%;
+            margin-right: 5px;
+            animation: amberPulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes amberPulse {
+            0%, 100% { opacity: 1; box-shadow: 0 0 0 0 var(--amber-glow); }
+            50% { opacity: 0.6; box-shadow: 0 0 0 8px transparent; }
+        }
+
+        .main {
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 1.5rem 2rem;
+        }
+
+        .hero {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .hero h1 {
+            font-size: 2.4rem;
+            font-weight: 800;
+            margin-bottom: 0.4rem;
+            background: var(--finops-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+
+        /* KPI row */
+        .kpi-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.25rem;
+        }
+
+        @media (max-width: 900px) { .kpi-row { grid-template-columns: repeat(2, 1fr); } }
+
+        .kpi-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 1.1rem 1.25rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--amber);
+        }
+
+        .kpi-card.spend::before { background: var(--amber); }
+        .kpi-card.bytes::before { background: var(--pink); }
+        .kpi-card.slots::before { background: #a78bfa; }
+        .kpi-card.anom::before { background: var(--red); }
+        .kpi-card.saved::before { background: var(--mint); }
+
+        .kpi-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.75rem;
+        }
+
+        .kpi-emoji { font-size: 1.2rem; opacity: 0.7; }
+
+        .kpi-delta {
+            font-size: 0.7rem;
+            font-family: 'Fira Code', monospace;
+            padding: 2px 6px;
+            border-radius: 5px;
+            font-weight: 600;
+        }
+
+        .kpi-delta.up { background: rgba(239, 68, 68, 0.15); color: var(--red); }
+        .kpi-delta.down { background: rgba(16, 185, 129, 0.15); color: var(--mint); }
+
+        .kpi-val {
+            font-size: 2rem;
+            font-weight: 800;
+            font-family: 'Fira Code', monospace;
+            line-height: 1.1;
+        }
+
+        .kpi-val.amber { color: var(--amber-bright); }
+        .kpi-val.pink { color: var(--pink-bright); }
+        .kpi-val.violet { color: #c4b5fd; }
+        .kpi-val.red { color: var(--red); }
+        .kpi-val.mint { color: var(--mint); }
+
+        .kpi-lbl {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-top: 0.25rem;
+        }
+
+        .workspace {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 1.25rem;
+            margin-bottom: 1.25rem;
+        }
+
+        @media (max-width: 1400px) { .workspace { grid-template-columns: 1fr; } }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(180deg, rgba(30, 18, 20, 0.6) 0%, transparent 100%);
+        }
+
+        .card-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .card-body { padding: 1.25rem; }
+
+        /* Chart */
+        .chart-container {
+            height: 260px;
+            position: relative;
+        }
+
+        .chart-container svg { width: 100%; height: 100%; }
+
+        /* Query stream */
+        .query-stream {
+            max-height: 420px;
+            overflow-y: auto;
+        }
+
+        .query-row {
+            display: grid;
+            grid-template-columns: auto 1fr auto auto auto auto;
+            gap: 0.75rem;
+            align-items: center;
+            padding: 0.7rem 0.85rem;
+            background: var(--bg-elevated);
+            border-radius: 10px;
+            margin-bottom: 0.4rem;
+            border-left: 3px solid transparent;
+            animation: rowIn 0.3s ease;
+            font-size: 0.72rem;
+        }
+
+        @keyframes rowIn {
+            from { opacity: 0; transform: translateX(-8px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .query-row.anomaly {
+            border-left-color: var(--red);
+            background: rgba(239, 68, 68, 0.06);
+        }
+
+        .query-row.high {
+            border-left-color: var(--pink);
+        }
+
+        .query-row.normal {
+            border-left-color: var(--mint);
+            opacity: 0.85;
+        }
+
+        .q-hash {
+            font-family: 'Fira Code', monospace;
+            color: var(--text-muted);
+            font-size: 0.68rem;
+        }
+
+        .q-dataset {
+            font-family: 'Fira Code', monospace;
+            color: var(--text-secondary);
+        }
+
+        .q-house {
+            padding: 2px 8px;
+            border-radius: 5px;
+            font-size: 0.65rem;
+            font-weight: 600;
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+
+        .q-bytes, .q-cost {
+            font-family: 'Fira Code', monospace;
+            font-weight: 600;
+        }
+
+        .q-bytes { color: var(--pink-bright); min-width: 70px; text-align: right; }
+        .q-cost { color: var(--amber-bright); min-width: 70px; text-align: right; }
+
+        .query-row.anomaly .q-cost { color: var(--red); }
+
+        .q-flag {
+            font-size: 0.6rem;
+            padding: 2px 5px;
+            border-radius: 4px;
+            font-family: 'Fira Code', monospace;
+            font-weight: 600;
+        }
+
+        .q-flag.anomaly { background: rgba(239, 68, 68, 0.2); color: var(--red); }
+        .q-flag.high { background: rgba(236, 72, 153, 0.2); color: var(--pink); }
+        .q-flag.ok { background: rgba(16, 185, 129, 0.15); color: var(--mint); }
+
+        /* Recommendations */
+        .reco-card {
+            padding: 0.85rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--mint);
+            border-radius: 10px;
+            margin-bottom: 0.6rem;
+            animation: rowIn 0.3s ease;
+        }
+
+        .reco-card.dormant { border-left-color: var(--pink); }
+        .reco-card.partition { border-left-color: var(--amber); }
+
+        .reco-top {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            align-items: center;
+        }
+
+        .reco-title {
+            font-size: 0.82rem;
+            font-weight: 700;
+            display: flex;
+            gap: 0.4rem;
+            align-items: center;
+        }
+
+        .reco-save {
+            font-size: 0.78rem;
+            font-family: 'Fira Code', monospace;
+            font-weight: 700;
+            color: var(--mint);
+        }
+
+        .reco-sub {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            line-height: 1.4;
+        }
+
+        .reco-ds {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.68rem;
+            color: var(--amber-bright);
+            padding: 2px 6px;
+            background: var(--bg-dark);
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .reco-actions {
+            display: flex;
+            gap: 0.4rem;
+            margin-top: 0.65rem;
+        }
+
+        .reco-btn {
+            padding: 0.35rem 0.6rem;
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-family: 'Sora', sans-serif;
+            transition: all 0.2s;
+        }
+
+        .reco-btn:hover {
+            border-color: var(--amber);
+            color: var(--amber);
+        }
+
+        .reco-btn.primary {
+            background: rgba(16, 185, 129, 0.15);
+            border-color: var(--mint);
+            color: var(--mint);
+            font-weight: 600;
+        }
+
+        .reco-btn.primary:hover {
+            background: rgba(16, 185, 129, 0.25);
+        }
+
+        /* Controls */
+        .demo-controls {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.85rem;
+        }
+
+        .btn {
+            padding: 0.6rem 0.9rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-family: 'Sora', sans-serif;
+            font-size: 0.76rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .btn:hover {
+            border-color: var(--amber);
+            background: rgba(245, 158, 11, 0.08);
+        }
+
+        .btn.primary {
+            background: var(--finops-gradient);
+            border: none;
+            color: white;
+            font-weight: 700;
+            box-shadow: 0 4px 20px rgba(245, 158, 11, 0.25);
+        }
+
+        .btn.primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 26px rgba(245, 158, 11, 0.4);
+        }
+
+        .btn.danger:hover {
+            border-color: var(--red);
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        /* Bottom row */
+        .bottom-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.25rem;
+        }
+
+        @media (max-width: 1100px) { .bottom-row { grid-template-columns: 1fr; } }
+
+        /* Per-domain chart */
+        .domain-bar {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            padding: 0.55rem 0;
+        }
+
+        .domain-label {
+            width: 150px;
+            font-size: 0.78rem;
+            font-weight: 500;
+        }
+
+        .domain-track {
+            flex: 1;
+            height: 14px;
+            background: var(--bg-elevated);
+            border-radius: 7px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .domain-fill {
+            height: 100%;
+            border-radius: 7px;
+            background: var(--finops-gradient);
+            transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .domain-val {
+            width: 80px;
+            text-align: right;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--amber-bright);
+        }
+
+        /* Anomaly timeline */
+        .timeline-events {
+            max-height: 320px;
+            overflow-y: auto;
+        }
+
+        .timeline-event {
+            display: flex;
+            gap: 0.65rem;
+            padding: 0.6rem 0.8rem;
+            background: var(--bg-elevated);
+            border-radius: 10px;
+            margin-bottom: 0.4rem;
+            border-left: 3px solid var(--red);
+            animation: rowIn 0.3s ease;
+        }
+
+        .timeline-event.warn { border-left-color: var(--amber); }
+        .timeline-event.info { border-left-color: var(--pink); }
+        .timeline-event.resolved { border-left-color: var(--mint); opacity: 0.75; }
+
+        .event-time {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            min-width: 40px;
+        }
+
+        .event-body { flex: 1; }
+
+        .event-title {
+            font-size: 0.76rem;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .event-sub {
+            font-size: 0.68rem;
+            color: var(--text-secondary);
+            font-family: 'Fira Code', monospace;
+        }
+
+        .event-cost {
+            font-size: 0.72rem;
+            font-family: 'Fira Code', monospace;
+            font-weight: 600;
+            color: var(--red);
+            align-self: center;
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-dark); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-amber);
+            border-radius: 12px;
+            padding: 0.85rem 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            box-shadow: 0 15px 50px rgba(0,0,0,0.6);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1000;
+            max-width: 340px;
+        }
+        .toast.show { transform: translateY(0); opacity: 1; }
+        .toast.error { border-color: var(--red); }
+        .toast.success { border-color: var(--mint); }
+        .toast-icon { font-size: 1.3rem; }
+        .toast-title { font-size: 0.85rem; font-weight: 600; }
+        .toast-message { font-size: 0.7rem; color: var(--text-muted); }
+
+        /* ML brain badge */
+        .ml-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 2px 6px;
+            border-radius: 5px;
+            background: rgba(167, 139, 250, 0.15);
+            color: #c4b5fd;
+            font-size: 0.6rem;
+            font-family: 'Fira Code', monospace;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">💰</div>
+                <div>
+                    <div class="logo-text">QueryFinOps Sentinel</div>
+                    <div class="logo-subtitle">Kering Data & AI Platform</div>
+                </div>
+            </div>
+            <div class="header-badges">
+                <span class="badge amber">● Monitoring</span>
+                <span class="badge">BigQuery</span>
+                <span class="badge">Dataflow</span>
+                <span class="badge">Airflow</span>
+                <span class="badge">ML Anomaly Detection</span>
+                <span class="badge">FinOps</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="hero">
+            <h1>💰 Spot cost anomalies before they spot you</h1>
+            <p>Real-time BigQuery + Dataflow FinOps across every Maison · ML-driven anomaly detection · autonomous savings recommendations</p>
+        </div>
+
+        <!-- KPI row -->
+        <div class="kpi-row">
+            <div class="kpi-card spend">
+                <div class="kpi-top">
+                    <span class="kpi-emoji">💶</span>
+                    <span class="kpi-delta up" id="kpiDeltaSpend">▲ 18.4%</span>
+                </div>
+                <div class="kpi-val amber" id="kpiSpend">€4,827</div>
+                <div class="kpi-lbl">Daily spend · vs 7d avg</div>
+            </div>
+            <div class="kpi-card bytes">
+                <div class="kpi-top">
+                    <span class="kpi-emoji">📊</span>
+                    <span class="kpi-delta up">▲ 12.1%</span>
+                </div>
+                <div class="kpi-val pink" id="kpiBytes">38.2 TB</div>
+                <div class="kpi-lbl">Bytes billed · 24h</div>
+            </div>
+            <div class="kpi-card slots">
+                <div class="kpi-top">
+                    <span class="kpi-emoji">⚡</span>
+                    <span class="kpi-delta down">▼ 3.2%</span>
+                </div>
+                <div class="kpi-val violet" id="kpiSlots">2,847</div>
+                <div class="kpi-lbl">Slot hours · 24h</div>
+            </div>
+            <div class="kpi-card anom">
+                <div class="kpi-top">
+                    <span class="kpi-emoji">🚨</span>
+                    <span class="ml-badge">🧠 ML</span>
+                </div>
+                <div class="kpi-val red" id="kpiAnom">3</div>
+                <div class="kpi-lbl">Live anomalies</div>
+            </div>
+        </div>
+
+        <!-- Main workspace -->
+        <div class="workspace">
+            <!-- LEFT: chart + query stream -->
+            <div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">📈 Daily Spend · Last 30 Days</h3>
+                        <span style="font-size: 0.7rem; color: var(--text-muted); font-family: 'Fira Code';">anomalies auto-flagged by isolation forest</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <svg viewBox="0 0 800 260" id="spendChart"></svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card" style="margin-top: 1rem;">
+                    <div class="card-header">
+                        <h3 class="card-title">🌊 Live Query Stream</h3>
+                        <span style="font-size: 0.7rem; color: var(--text-muted); font-family: 'Fira Code';" id="streamStatus">● streaming</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="query-stream" id="queryStream"></div>
+                        <div class="demo-controls">
+                            <button class="btn primary" id="toggleStreamBtn" onclick="toggleStream()">⏸️ Pause Stream</button>
+                            <button class="btn danger" onclick="injectAnomaly()">🚨 Inject Anomaly</button>
+                            <button class="btn" onclick="clearStream()">🗑️ Clear</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT: ML recommendations -->
+            <div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">🧠 ML Recommendations</h3>
+                        <span style="font-size: 0.65rem; color: var(--mint); font-family: 'Fira Code';" id="savingsCount">€312/day savings</span>
+                    </div>
+                    <div class="card-body">
+                        <div id="recommendations">
+                            <div class="reco-card partition">
+                                <div class="reco-top">
+                                    <div class="reco-title">🗂️ <span>Add partitioning</span></div>
+                                    <div class="reco-save">€47/day</div>
+                                </div>
+                                <div class="reco-sub">
+                                    Full table scans detected 340× in 7d on a non-partitioned table. Partitioning by <code style="color: var(--amber);">event_ts</code> (DAY) cuts 82% of bytes billed.
+                                </div>
+                                <div class="reco-ds">gucci_sales.orders_stream</div>
+                                <div class="reco-actions">
+                                    <button class="reco-btn primary" onclick="acceptReco(this, '€47/day')">✓ Apply PR</button>
+                                    <button class="reco-btn">View queries</button>
+                                </div>
+                            </div>
+
+                            <div class="reco-card">
+                                <div class="reco-top">
+                                    <div class="reco-title">📦 <span>Add clustering</span></div>
+                                    <div class="reco-save">€89/day</div>
+                                </div>
+                                <div class="reco-sub">
+                                    97% of queries filter by <code style="color: var(--amber);">(maison, customer_tier)</code>. Clustering reduces slot-ms by ~71%.
+                                </div>
+                                <div class="reco-ds">group_client.customer_360_fact</div>
+                                <div class="reco-actions">
+                                    <button class="reco-btn primary" onclick="acceptReco(this, '€89/day')">✓ Apply PR</button>
+                                    <button class="reco-btn">Simulate</button>
+                                </div>
+                            </div>
+
+                            <div class="reco-card dormant">
+                                <div class="reco-top">
+                                    <div class="reco-title">💀 <span>Dormant dataset</span></div>
+                                    <div class="reco-save">€124/day</div>
+                                </div>
+                                <div class="reco-sub">
+                                    No query activity in 94 days. Storage cost alone: €124/day. Candidate for long-term storage tier or archival.
+                                </div>
+                                <div class="reco-ds">bottega_legacy.migration_snapshot_2024</div>
+                                <div class="reco-actions">
+                                    <button class="reco-btn primary" onclick="acceptReco(this, '€124/day')">✓ Archive</button>
+                                    <button class="reco-btn">Notify owner</button>
+                                </div>
+                            </div>
+
+                            <div class="reco-card">
+                                <div class="reco-top">
+                                    <div class="reco-title">🧊 <span>Materialized view</span></div>
+                                    <div class="reco-save">€52/day</div>
+                                </div>
+                                <div class="reco-sub">
+                                    6 dashboards run the same CTE 480×/day. An MV would cut repeated scans on <code style="color: var(--amber);">retail_ops.store_kpis</code>.
+                                </div>
+                                <div class="reco-ds">retail_ops.store_kpis_daily</div>
+                                <div class="reco-actions">
+                                    <button class="reco-btn primary" onclick="acceptReco(this, '€52/day')">✓ Create MV</button>
+                                    <button class="reco-btn">Dry-run</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom: per-domain + anomaly timeline -->
+        <div class="bottom-row">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">🏛️ Cost per House · last 24h</h3>
+                </div>
+                <div class="card-body">
+                    <div id="domainBars"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">🚨 Anomaly Timeline</h3>
+                    <span style="font-size: 0.65rem; color: var(--text-muted);" id="anomCount">5 events</span>
+                </div>
+                <div class="card-body">
+                    <div class="timeline-events" id="timelineEvents"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div class="toast" id="toast">
+        <span class="toast-icon">✅</span>
+        <div>
+            <div class="toast-title" id="toastTitle">Saved</div>
+            <div class="toast-message" id="toastMessage"></div>
+        </div>
+    </div>
+
+    <script>
+        // ---------- Spend chart ----------
+        const chartSvg = document.getElementById('spendChart');
+        function renderChart() {
+            const days = 30;
+            const points = [];
+            let base = 3200;
+            for (let i = 0; i < days; i++) {
+                const noise = (Math.random() - 0.4) * 400;
+                const trend = i * 25;
+                let v = base + trend + noise;
+                if (i === 12) v += 1600; // anomaly
+                if (i === 22) v += 1100; // anomaly
+                if (i === days - 1) v = 4827;
+                points.push(Math.max(500, v));
+            }
+
+            const w = 800, h = 260, padL = 40, padR = 20, padT = 20, padB = 30;
+            const chartW = w - padL - padR;
+            const chartH = h - padT - padB;
+            const max = Math.max(...points) * 1.1;
+            const min = Math.min(...points) * 0.8;
+
+            const xs = i => padL + (i / (days - 1)) * chartW;
+            const ys = v => padT + chartH - ((v - min) / (max - min)) * chartH;
+
+            // Area path
+            let areaD = `M ${xs(0)} ${padT + chartH}`;
+            let lineD = '';
+            points.forEach((p, i) => {
+                areaD += ` L ${xs(i)} ${ys(p)}`;
+                lineD += (i === 0 ? 'M' : 'L') + ` ${xs(i)} ${ys(p)}`;
+            });
+            areaD += ` L ${xs(days - 1)} ${padT + chartH} Z`;
+
+            // Grid
+            let grid = '';
+            for (let i = 0; i <= 4; i++) {
+                const y = padT + (i / 4) * chartH;
+                const label = ((max - ((max - min) * i / 4)) / 1000).toFixed(1) + 'k';
+                grid += `<line x1="${padL}" y1="${y}" x2="${w - padR}" y2="${y}" stroke="#2b1e1c" stroke-width="1"/>`;
+                grid += `<text x="${padL - 6}" y="${y + 4}" fill="#70604e" font-size="10" font-family="Fira Code" text-anchor="end">${label}</text>`;
+            }
+
+            // Anomaly markers
+            let anomMarkers = '';
+            points.forEach((p, i) => {
+                const avg = base + i * 25;
+                if (p > avg + 900) {
+                    anomMarkers += `<circle cx="${xs(i)}" cy="${ys(p)}" r="5" fill="#ef4444" stroke="#14090a" stroke-width="2">
+                        <animate attributeName="r" values="5;8;5" dur="1.5s" repeatCount="indefinite"/>
+                    </circle>`;
+                    anomMarkers += `<circle cx="${xs(i)}" cy="${ys(p)}" r="12" fill="none" stroke="#ef4444" stroke-width="1" opacity="0.4">
+                        <animate attributeName="r" values="10;16;10" dur="1.5s" repeatCount="indefinite"/>
+                        <animate attributeName="opacity" values="0.4;0;0.4" dur="1.5s" repeatCount="indefinite"/>
+                    </circle>`;
+                }
+            });
+
+            chartSvg.innerHTML = `
+                <defs>
+                    <linearGradient id="areaGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.35"/>
+                        <stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/>
+                    </linearGradient>
+                    <linearGradient id="lineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="#f59e0b"/>
+                        <stop offset="50%" stop-color="#ec4899"/>
+                        <stop offset="100%" stop-color="#a78bfa"/>
+                    </linearGradient>
+                </defs>
+                ${grid}
+                <path d="${areaD}" fill="url(#areaGrad)"/>
+                <path d="${lineD}" fill="none" stroke="url(#lineGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                ${anomMarkers}
+            `;
+        }
+
+        // ---------- Query stream ----------
+        const houses = ['gucci', 'saint-laurent', 'bottega', 'balenciaga', 'boucheron', 'brioni', 'pomellato', 'eyewear', 'beaute'];
+        const datasets = ['client_360_fact', 'sales_events_stream', 'stock_levels_daily', 'store_kpis', 'loyalty_enrollments', 'campaign_attribution', 'returns_flow', 'inventory_forecast'];
+        const ops = ['SELECT *', 'aggregation', 'JOIN', 'CTE', 'window fn', 'UNNEST', 'LATERAL'];
+
+        let streamEnabled = true;
+        let queryCount = 0;
+
+        function newQueryRow(forceAnomaly) {
+            const stream = document.getElementById('queryStream');
+            const house = houses[Math.floor(Math.random() * houses.length)];
+            const ds = datasets[Math.floor(Math.random() * datasets.length)];
+            const op = ops[Math.floor(Math.random() * ops.length)];
+            const hash = 'q_' + Math.random().toString(36).substr(2, 8);
+
+            let bytes, cost, type;
+            if (forceAnomaly || Math.random() < 0.08) {
+                bytes = (5 + Math.random() * 15).toFixed(1) + ' TB';
+                cost = '€' + (30 + Math.random() * 80).toFixed(2);
+                type = 'anomaly';
+            } else if (Math.random() < 0.2) {
+                bytes = (300 + Math.random() * 700).toFixed(0) + ' GB';
+                cost = '€' + (5 + Math.random() * 15).toFixed(2);
+                type = 'high';
+            } else {
+                bytes = (Math.random() < 0.5 ? (10 + Math.random() * 80).toFixed(0) + ' GB' : (Math.random() * 900).toFixed(0) + ' MB');
+                cost = '€' + (Math.random() * 4).toFixed(2);
+                type = 'normal';
+            }
+
+            const row = document.createElement('div');
+            row.className = 'query-row ' + type;
+            row.innerHTML = `
+                <span class="q-hash">${hash}</span>
+                <span class="q-dataset">${house}.${ds} · ${op}</span>
+                <span class="q-house">${house}</span>
+                <span class="q-bytes">${bytes}</span>
+                <span class="q-cost">${cost}</span>
+                <span class="q-flag ${type}">${type === 'anomaly' ? '🚨 ANOM' : type === 'high' ? '⚠ HIGH' : '✓ OK'}</span>
+            `;
+
+            stream.insertBefore(row, stream.firstChild);
+            queryCount++;
+
+            if (stream.children.length > 18) {
+                stream.lastChild.remove();
+            }
+
+            if (type === 'anomaly') {
+                addAnomalyEvent(`Spike detected · ${house}.${ds}`, cost + ' single-query cost', 'anomaly');
+                bumpAnomalyCount();
+            }
+        }
+
+        function startStream() {
+            if (window._streamInt) return;
+            window._streamInt = setInterval(() => {
+                if (streamEnabled) newQueryRow();
+            }, 1200);
+        }
+
+        function toggleStream() {
+            streamEnabled = !streamEnabled;
+            const btn = document.getElementById('toggleStreamBtn');
+            const status = document.getElementById('streamStatus');
+            if (streamEnabled) {
+                btn.textContent = '⏸️ Pause Stream';
+                status.textContent = '● streaming';
+                status.style.color = '';
+            } else {
+                btn.textContent = '▶️ Resume Stream';
+                status.textContent = '⏸ paused';
+                status.style.color = 'var(--text-muted)';
+            }
+        }
+
+        function clearStream() {
+            document.getElementById('queryStream').innerHTML = '';
+            queryCount = 0;
+        }
+
+        function injectAnomaly() {
+            newQueryRow(true);
+            showToast('🚨 Anomaly injected', 'Isolation Forest flagged a cost outlier', 'error');
+        }
+
+        function bumpAnomalyCount() {
+            const el = document.getElementById('kpiAnom');
+            const v = parseInt(el.textContent) || 0;
+            el.textContent = v + 1;
+        }
+
+        // ---------- Domain bars ----------
+        const domainData = [
+            { name: 'Gucci', value: 1432, pct: 82 },
+            { name: 'Saint Laurent', value: 984, pct: 56 },
+            { name: 'Bottega Veneta', value: 726, pct: 41 },
+            { name: 'Balenciaga', value: 612, pct: 35 },
+            { name: 'Boucheron', value: 418, pct: 24 },
+            { name: 'Brioni', value: 287, pct: 17 },
+            { name: 'Kering Eyewear', value: 221, pct: 13 },
+            { name: 'Kering Beauté', value: 147, pct: 8 },
+        ];
+
+        function renderDomains() {
+            const host = document.getElementById('domainBars');
+            host.innerHTML = '';
+            domainData.forEach(d => {
+                const el = document.createElement('div');
+                el.className = 'domain-bar';
+                el.innerHTML = `
+                    <div class="domain-label">${d.name}</div>
+                    <div class="domain-track"><div class="domain-fill" style="width: 0%"></div></div>
+                    <div class="domain-val">€${d.value}</div>
+                `;
+                host.appendChild(el);
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        el.querySelector('.domain-fill').style.width = d.pct + '%';
+                    });
+                });
+            });
+        }
+
+        // ---------- Anomaly timeline ----------
+        function addAnomalyEvent(title, sub, type) {
+            const host = document.getElementById('timelineEvents');
+            const now = new Date();
+            const t = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+            const el = document.createElement('div');
+            el.className = 'timeline-event ' + (type || '');
+            el.innerHTML = `
+                <div class="event-time">${t}</div>
+                <div class="event-body">
+                    <div class="event-title">${title}</div>
+                    <div class="event-sub">${sub}</div>
+                </div>
+            `;
+            host.insertBefore(el, host.firstChild);
+            if (host.children.length > 8) host.lastChild.remove();
+            document.getElementById('anomCount').textContent = host.children.length + ' events';
+        }
+
+        function seedTimeline() {
+            addAnomalyEvent('Dormant dataset detected', 'bottega_legacy · €124/day waste', 'warn');
+            addAnomalyEvent('Runaway query killed', 'gucci_client.events · 14.3 TB scan blocked', 'anomaly');
+            addAnomalyEvent('Slot-spike on Airflow', 'daily_refresh_dag · 3.2× expected', 'info');
+            addAnomalyEvent('Clustering suggestion applied', 'saint_laurent.orders · €62/day saved', 'resolved');
+            addAnomalyEvent('Cross-region query flagged', 'balenciaga → EU data to US endpoint', 'warn');
+        }
+
+        // ---------- Recommendation accept ----------
+        function acceptReco(btn, save) {
+            const card = btn.closest('.reco-card');
+            card.style.transition = 'all 0.4s';
+            card.style.opacity = '0.4';
+            card.style.borderLeftColor = 'var(--mint)';
+            btn.textContent = '✓ Applied';
+            btn.disabled = true;
+            btn.style.opacity = '0.6';
+            addAnomalyEvent('Recommendation applied', save + ' savings projected', 'resolved');
+            showToast('💚 Saved ' + save, 'PR opened · awaiting review', 'success');
+        }
+
+        // ---------- Toast ----------
+        function showToast(title, message, type) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastTitle').textContent = title;
+            document.getElementById('toastMessage').textContent = message;
+            toast.className = 'toast show';
+            if (type) toast.classList.add(type);
+            setTimeout(() => toast.classList.remove('show'), 3200);
+        }
+
+        // ---------- Init ----------
+        renderChart();
+        renderDomains();
+        seedTimeline();
+        // Seed initial stream
+        for (let i = 0; i < 6; i++) newQueryRow();
+        startStream();
+    </script>
+</body>
+</html>
