@@ -1,0 +1,1 @@
+# QueryFinOps-Sentinel
